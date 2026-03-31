@@ -1,4 +1,3 @@
-import { ApprovalOverlay } from "./components/ApprovalOverlay";
 import { LoginPage } from "./components/LoginPage";
 import { ChatHeader, ChatMessageList, ChatComposer } from "./components/chat";
 import { ContextUsageBar } from "./components/chat/ContextUsageBar";
@@ -38,6 +37,7 @@ export default function App() {
     isEmpty,
     hasSession,
     showLanding,
+    hasPendingApproval,
     showCreateTapeDialog,
     setShowCreateTapeDialog,
     showCreateHandoffDialog,
@@ -101,10 +101,10 @@ export default function App() {
           loading={loading}
           onSend={() => void sendMessage()}
           inputRef={inputRef}
+          tapeName={tapeName}
+          hasPendingApproval={hasPendingApproval}
         />
       </div>
-
-      <ApprovalOverlay />
 
       <TapeSelectDialog
         open={showTapeSelectDialog}
