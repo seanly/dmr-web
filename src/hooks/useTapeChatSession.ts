@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo, type KeyboardEvent }
 import { NEW_TAPE_SELECT_VALUE, NEW_HANDOFF_SELECT_VALUE } from "../constants";
 import { loadWebPrefs, saveWebPrefs } from "../lib/webPrefs";
 import { mergeTapeDisplayForLoading, parseDataStream, type ContextUsage } from "../lib/chatUtils";
+import { requestNotificationPermission, sendNotification } from "../lib/notification";
 import type { Message, ApprovalInfo, TapeAnchorRow } from "../types/chat";
 
 /** Parse approval reply: y/s/a/n [// comment], or batch indices like 1,3,5 */
@@ -87,6 +88,13 @@ export function useTapeChatSession() {
       .finally(() => setAuthChecked(true));
   }, []);
 
+  // Request notification permission once auth is resolved
+  useEffect(() => {
+    if (!authChecked) return;
+    if (authEnabled && user == null) return;
+    requestNotificationPermission();
+  }, [authChecked, authEnabled, user]);
+
   useEffect(() => {
     saveWebPrefs(tapeName, historyAfterEntryId);
   }, [tapeName, historyAfterEntryId]);
@@ -156,6 +164,9 @@ export function useTapeChatSession() {
         if (prev.some((m) => m.approval?.id === event.id)) return prev;
         return [...prev, { role: "assistant", content: "", approval: event }];
       });
+      // Browser notification for new approval
+      const desc = event.tool ? `${event.tool}: ${event.decision?.action || "pending"}` : "New approval";
+      sendNotification("DMR Approval Required", desc);
     });
     return () => es.close();
   }, [authChecked, authEnabled, user]);

@@ -1,7 +1,9 @@
-import { Bot, ChevronDown, Anchor } from "lucide-react";
+import { Bot, ChevronDown, Anchor, Sun, Moon } from "lucide-react";
+import { useState, useEffect } from "react";
 import type { Message, TapeAnchorRow } from "../../types/chat";
 import { TopOutlineMenu } from "./TopOutlineMenu";
 import { UserMenu } from "./UserMenu";
+import { toggleTheme } from "../../lib/theme";
 import type { RefObject } from "react";
 
 type Props = {
@@ -48,6 +50,16 @@ export function ChatHeader({
       : `#${historyAfterEntryId}`
     : "Default";
 
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setDark(document.documentElement.classList.contains("dark"));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <header className="border-b border-border/60 px-4 sm:px-5 py-2">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 justify-between">
@@ -86,6 +98,14 @@ export function ChatHeader({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title={dark ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          </button>
           <TopOutlineMenu
             isEmpty={isEmpty}
             browsePrefixLength={browsePrefixLength}
