@@ -194,6 +194,37 @@ export function useTapeChatSession() {
         : `[${event.tape}] ${event.tool}`;
       sendNotification("DMR Approval Required", desc);
     });
+
+    // Listen for tape_updated events to auto-refresh history
+    es.addEventListener("tape_updated", (e) => {
+      const data: { tape?: string } = JSON.parse((e as MessageEvent).data);
+      if (data.tape === tapeName) {
+        // Reload history from backend
+        const baseQ = new URLSearchParams({ tape: tapeName });
+        fetch(`/api/history?${baseQ.toString()}`)
+          .then((r) => r.json())
+          .then((hist: { messages?: Message[] }) => {
+            if (Array.isArray(hist.messages)) {
+              setMessages((prev) => {
+                const approvals = prev.filter((m) => m.approval && !m.approval.resolved);
+                return approvals.length > 0 ? [...hist.messages!, ...approvals] : hist.messages!;
+              });
+              setLoadedHistoryCount(hist.messages.length);
+            }
+          })
+          .catch(() => {});
+      }
+    });
+
+    // When SSE disconnects (e.g. backend restart), check if session is still valid
+    es.onerror = () => {
+      if (authEnabled) {
+        fetch("/api/me").then((r) => {
+          if (r.status === 401) setUser(null);
+        }).catch(() => {});
+      }
+    };
+
     return () => es.close();
   }, [authChecked, authEnabled, user, tapeName]);
 
@@ -387,6 +418,10 @@ export function useTapeChatSession() {
       });
       const body = await resp.text();
       if (!resp.ok) {
+        if (resp.status === 401 && authEnabled) {
+          setUser(null);
+          return;
+        }
         setMessages((prev) => [
           ...prev,
           {
