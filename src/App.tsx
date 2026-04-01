@@ -38,6 +38,7 @@ export default function App() {
     hasSession,
     showLanding,
     hasPendingApproval,
+    globalPendingByTape,
     showCreateTapeDialog,
     setShowCreateTapeDialog,
     showCreateHandoffDialog,
@@ -111,6 +112,7 @@ export default function App() {
         onClose={() => setShowTapeSelectDialog(false)}
         currentTape={tapeName}
         tapes={tapeOptions}
+        pendingByTape={globalPendingByTape}
         onSelect={handleTapeChange}
         onRefresh={loadTapes}
         onCreateNew={() => setShowCreateTapeDialog(true)}

@@ -53,6 +53,7 @@ export function useTapeChatSession() {
   const [loadedHistoryCount, setLoadedHistoryCount] = useState(0);
   const [browsePrefixLength, setBrowsePrefixLength] = useState(0);
   const [contextUsage, setContextUsage] = useState<ContextUsage>({ promptTokens: 0, completionTokens: 0, contextBudget: 0 });
+  const [globalPendingByTape, setGlobalPendingByTape] = useState<Map<string, number>>(new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -144,14 +145,26 @@ export function useTapeChatSession() {
     fetch("/api/approvals/pending")
       .then((r) => (r.ok ? r.json() : { events: [] }))
       .then((data: { events?: ApprovalInfo[] }) => {
-        if (Array.isArray(data.events) && data.events.length > 0) {
-          setMessages((prev) => {
-            const existingIds = new Set(prev.filter((m) => m.approval).map((m) => m.approval!.id));
-            const newApprovals = data.events!
-              .filter((e) => !existingIds.has(e.id))
-              .map((e): Message => ({ role: "assistant", content: "", approval: e }));
-            return newApprovals.length > 0 ? [...prev, ...newApprovals] : prev;
+        if (Array.isArray(data.events)) {
+          // Count pending by tape
+          const counts = new Map<string, number>();
+          data.events.forEach((e) => {
+            if (!e.resolved && e.tape) {
+              counts.set(e.tape, (counts.get(e.tape) || 0) + 1);
+            }
           });
+          setGlobalPendingByTape(counts);
+
+          // Only load current tape's approvals into messages
+          if (data.events.length > 0) {
+            setMessages((prev) => {
+              const existingIds = new Set(prev.filter((m) => m.approval).map((m) => m.approval!.id));
+              const newApprovals = data.events!
+                .filter((e) => !existingIds.has(e.id) && e.tape === tapeName)
+                .map((e): Message => ({ role: "assistant", content: "", approval: e }));
+              return newApprovals.length > 0 ? [...prev, ...newApprovals] : prev;
+            });
+          }
         }
       })
       .catch(() => {});
@@ -159,24 +172,37 @@ export function useTapeChatSession() {
     const es = new EventSource("/api/approvals");
     es.addEventListener("approval", (e) => {
       const event: ApprovalInfo = JSON.parse((e as MessageEvent).data);
-      setMessages((prev) => {
-        // Deduplicate: skip if already present
-        if (prev.some((m) => m.approval?.id === event.id)) return prev;
-        return [...prev, { role: "assistant", content: "", approval: event }];
+
+      // Update global pending count
+      setGlobalPendingByTape((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(event.tape, (newMap.get(event.tape) || 0) + 1);
+        return newMap;
       });
-      // Browser notification for new approval
-      const desc = event.tool ? `${event.tool}: ${event.decision?.action || "pending"}` : "New approval";
+
+      // Only add to messages if it's for current tape
+      if (event.tape === tapeName) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.approval?.id === event.id)) return prev;
+          return [...prev, { role: "assistant", content: "", approval: event }];
+        });
+      }
+
+      // Browser notification
+      const desc = event.tape === tapeName
+        ? `${event.tool}: ${event.decision?.action || "pending"}`
+        : `[${event.tape}] ${event.tool}`;
       sendNotification("DMR Approval Required", desc);
     });
     return () => es.close();
-  }, [authChecked, authEnabled, user]);
+  }, [authChecked, authEnabled, user, tapeName]);
 
   // Load history: optional selected anchor + always after last anchor; concat without dedup
   useEffect(() => {
     if (!authChecked) return;
     if (authEnabled && user == null) return;
 
-    setMessages([]);
+    setMessages((prev) => prev.filter((m) => m.approval && !m.approval.resolved));
     setLoadedHistoryCount(0);
     setBrowsePrefixLength(0);
 
@@ -189,15 +215,23 @@ export function useTapeChatSession() {
     const hasFrom =
       historyAfterEntryId != null && historyAfterEntryId > 0 && !Number.isNaN(historyAfterEntryId);
 
+    // Helper: merge history messages with any unresolved approval messages from current state
+    const setMessagesWithApprovals = (hist: Message[]) => {
+      setMessages((prev) => {
+        const approvals = prev.filter((m) => m.approval && !m.approval.resolved);
+        return approvals.length > 0 ? [...hist, ...approvals] : hist;
+      });
+    };
+
     if (!hasFrom) {
       fetchLive()
         .then((live) => {
-          setMessages(live);
+          setMessagesWithApprovals(live);
           setLoadedHistoryCount(live.length);
           setBrowsePrefixLength(0);
         })
         .catch(() => {
-          setMessages([]);
+          setMessages((prev) => prev.filter((m) => m.approval && !m.approval.resolved));
           setLoadedHistoryCount(0);
           setBrowsePrefixLength(0);
         });
@@ -213,12 +247,12 @@ export function useTapeChatSession() {
     Promise.all([fetchBrowse(), fetchLive()])
       .then(([browse, live]) => {
         const { display, browsePrefixLength: blen } = mergeTapeDisplayForLoading(browse, live, true);
-        setMessages(display);
+        setMessagesWithApprovals(display);
         setLoadedHistoryCount(display.length);
         setBrowsePrefixLength(blen);
       })
       .catch(() => {
-        setMessages([]);
+        setMessages((prev) => prev.filter((m) => m.approval && !m.approval.resolved));
         setLoadedHistoryCount(0);
         setBrowsePrefixLength(0);
       });
@@ -288,9 +322,24 @@ export function useTapeChatSession() {
 
       const markResolved = (id: string) =>
         setMessages((prev) =>
-          prev.map((m) =>
-            m.approval?.id === id ? { ...m, approval: { ...m.approval, resolved: true } } : m,
-          ),
+          prev.map((m) => {
+            if (m.approval?.id === id) {
+              // Decrement global pending count
+              setGlobalPendingByTape((counts) => {
+                const newMap = new Map(counts);
+                const tape = m.approval!.tape;
+                const count = newMap.get(tape) || 0;
+                if (count > 1) {
+                  newMap.set(tape, count - 1);
+                } else {
+                  newMap.delete(tape);
+                }
+                return newMap;
+              });
+              return { ...m, approval: { ...m.approval, resolved: true } };
+            }
+            return m;
+          }),
         );
 
       if (parsed) {
@@ -441,6 +490,7 @@ export function useTapeChatSession() {
     hasSession,
     showLanding,
     hasPendingApproval,
+    globalPendingByTape,
     // Dialog states
     showCreateTapeDialog,
     setShowCreateTapeDialog,

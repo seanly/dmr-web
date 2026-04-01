@@ -6,6 +6,7 @@ type TapeSelectDialogProps = {
   onClose: () => void;
   currentTape: string;
   tapes: string[];
+  pendingByTape?: Map<string, number>;
   onSelect: (tape: string) => void;
   onRefresh: () => void;
   onCreateNew: () => void;
@@ -16,6 +17,7 @@ export function TapeSelectDialog({
   onClose,
   currentTape,
   tapes,
+  pendingByTape,
   onSelect,
   onRefresh,
   onCreateNew,
@@ -49,18 +51,26 @@ export function TapeSelectDialog({
         </div>
 
         <div className="max-h-[400px] space-y-1 overflow-y-auto rounded-md border border-border">
-          {tapes.map((tape) => (
-            <button
-              key={tape}
-              type="button"
-              onClick={() => handleSelect(tape)}
-              className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted ${
-                tape === currentTape ? "bg-muted font-medium text-foreground" : "text-foreground"
-              }`}
-            >
-              {tape}
-            </button>
-          ))}
+          {tapes.map((tape) => {
+            const pending = pendingByTape?.get(tape) || 0;
+            return (
+              <button
+                key={tape}
+                type="button"
+                onClick={() => handleSelect(tape)}
+                className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-muted ${
+                  tape === currentTape ? "bg-muted font-medium text-foreground" : "text-foreground"
+                }`}
+              >
+                <span>{tape}</span>
+                {pending > 0 && (
+                  <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 text-xs font-medium text-white">
+                    {pending}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 

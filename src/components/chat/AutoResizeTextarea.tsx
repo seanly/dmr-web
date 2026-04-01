@@ -29,7 +29,7 @@ export function AutoResizeTextarea({
       onKeyDown={onKeyDown}
       placeholder="Type a message..."
       disabled={disabled}
-      className="min-h-[40px] w-full resize-none border-none bg-transparent shadow-none outline-none focus-visible:ring-0 px-4 py-3 text-sm leading-relaxed placeholder:text-muted-foreground/50"
+      className="min-h-[40px] w-full resize-none border-none bg-transparent shadow-none outline-none focus-visible:ring-0 px-4 py-3 text-sm leading-relaxed placeholder:text-muted-foreground/50 overflow-hidden"
       rows={1}
       autoFocus
     />

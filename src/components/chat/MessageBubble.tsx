@@ -1,7 +1,36 @@
-import { Bot, Shield, ShieldAlert } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Bot, Shield, ShieldAlert, Clock } from "lucide-react";
 import { Markdown } from "../Markdown";
 import type { Message, ApprovalInfo, ApprovalEventItem } from "../../types/chat";
 import { ToolCallCard } from "./ToolCallCard";
+
+function ApprovalCountdown({ createdAt, timeoutSec }: { createdAt: number; timeoutSec: number }) {
+  const [remaining, setRemaining] = useState(() => {
+    const deadline = createdAt + timeoutSec;
+    return Math.max(0, deadline - Math.floor(Date.now() / 1000));
+  });
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const deadline = createdAt + timeoutSec;
+      const left = Math.max(0, deadline - Math.floor(Date.now() / 1000));
+      setRemaining(left);
+      if (left <= 0) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [createdAt, timeoutSec]);
+
+  const mins = Math.floor(remaining / 60);
+  const secs = remaining % 60;
+  const isUrgent = remaining <= 30;
+
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs ${isUrgent ? "text-destructive" : "text-muted-foreground"}`}>
+      <Clock className="size-3" />
+      {remaining <= 0 ? "Expired" : `${mins}:${String(secs).padStart(2, "0")}`}
+    </span>
+  );
+}
 
 function ApprovalBubble({ approval }: { approval: ApprovalInfo }) {
   const isBatch = approval.type === "batch" && approval.requests && approval.requests.length > 0;
@@ -20,10 +49,15 @@ function ApprovalBubble({ approval }: { approval: ApprovalInfo }) {
             : <Shield className="size-4 text-amber-600" />}
       </div>
       <div className={`min-w-0 flex-1 rounded-lg border p-4 shadow-sm ${resolved ? "bg-muted/50 border-border/30" : "bg-card"}`}>
-        <div className="font-semibold text-sm mb-2">
-          {resolved
-            ? (isBatch ? `Approved (${approval.requests!.length} commands)` : "Approved")
-            : (isBatch ? `Approval Required (${approval.requests!.length} commands)` : "Approval Required")}
+        <div className="font-semibold text-sm mb-2 flex items-center justify-between">
+          <span>
+            {resolved
+              ? (isBatch ? `Approved (${approval.requests!.length} commands)` : "Approved")
+              : (isBatch ? `Approval Required (${approval.requests!.length} commands)` : "Approval Required")}
+          </span>
+          {!resolved && approval.created_at && approval.timeout_sec && (
+            <ApprovalCountdown createdAt={approval.created_at} timeoutSec={approval.timeout_sec} />
+          )}
         </div>
 
         {isBatch ? (
@@ -69,21 +103,28 @@ function SingleApprovalContent({ approval }: { approval: ApprovalInfo }) {
   );
 }
 
-/** Show command text: up to 3 lines visible, full text in title tooltip */
+/** Show command text: up to 3 lines visible, click to expand with scroll */
 function CmdBlock({ text }: { text: string }) {
   const lines = text.split("\n");
+  const [expanded, setExpanded] = useState(false);
   const truncated = lines.length > 3;
-  const visible = truncated ? lines.slice(0, 3) : lines;
+  const visible = expanded || !truncated ? lines : lines.slice(0, 3);
   return (
-    <pre
-      className="mt-2 bg-muted p-3 rounded text-xs overflow-x-auto font-mono cursor-default"
-      title={truncated ? text : undefined}
-    >
-      {visible.map((line, i) => (
-        <div key={i}><span className="text-muted-foreground mr-3 select-none">{i + 1}</span>{line}</div>
-      ))}
-      {truncated && <div className="text-muted-foreground/60 italic select-none">... ({lines.length - 3} more lines — hover to see full command)</div>}
-    </pre>
+    <div className="mt-2">
+      <pre className={`bg-muted p-3 rounded text-xs font-mono overflow-auto ${expanded ? "max-h-[300px]" : ""}`}>
+        {visible.map((line, i) => (
+          <div key={i}><span className="text-muted-foreground mr-3 select-none">{i + 1}</span>{line}</div>
+        ))}
+      </pre>
+      {truncated && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="mt-1 text-xs text-primary hover:underline"
+        >
+          {expanded ? "Show less" : `Show all (${lines.length} lines)`}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -96,18 +137,10 @@ function BatchApprovalContent({ requests }: { requests: ApprovalEventItem[] }) {
           <div key={idx} className="border-l-2 border-primary/30 pl-3 py-1">
             <div className="text-sm flex items-start gap-1">
               <span className="font-medium text-muted-foreground shrink-0">{idx + 1}.</span>
-              {cmdText ? (
-                <code
-                  className="text-xs bg-muted px-1.5 py-0.5 rounded break-all line-clamp-3 cursor-default"
-                  title={cmdText}
-                >
-                  {cmdText}
-                </code>
-              ) : (
-                <span className="text-muted-foreground">[{req.tool}]</span>
-              )}
+              {!cmdText && <span className="text-muted-foreground">[{req.tool}]</span>}
               {req.decision.risk === "high" && <span className="ml-1.5 text-xs text-destructive font-medium shrink-0">HIGH</span>}
             </div>
+            {cmdText && <CmdBlock text={cmdText} />}
           </div>
         );
       })}
