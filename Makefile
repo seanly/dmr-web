@@ -1,7 +1,7 @@
 .PHONY: install build dev clean
 
 PKG_MANAGER := $(shell command -v pnpm 2>/dev/null && echo pnpm || echo npm)
-INSTALL_DIR := $(HOME)/.dmr/web
+INSTALL_DIR := $(HOME)/.dmr/var/lib/webserver
 
 install: build
 	@echo "Installing DMR Web UI to $(INSTALL_DIR)/dist..."
@@ -18,7 +18,7 @@ install: build
 	@echo "  [plugins.config.server]"
 	@echo "  enabled = true"
 	@echo "  listen = \":8080\""
-	@echo "  ui_path = \"~/.dmr/web/dist\""
+	@echo "  ui_path = \"~/.dmr/var/lib/webserver/dist\""
 
 build:
 	@echo "Building DMR Web UI..."
@@ -45,9 +45,9 @@ help:
 	@echo "DMR Web UI Makefile"
 	@echo ""
 	@echo "Targets:"
-	@echo "  install    - Build and install to ~/.dmr/web/dist"
+	@echo "  install    - Build and install to ~/.dmr/var/lib/webserver/dist"
 	@echo "  build      - Build the UI (output to dist/)"
 	@echo "  dev        - Start development server (hot reload)"
 	@echo "  clean      - Remove build artifacts"
-	@echo "  uninstall  - Remove installed UI from ~/.dmr/web/"
+	@echo "  uninstall  - Remove installed UI from ~/.dmr/var/lib/webserver/"
 	@echo "  help       - Show this help message"

@@ -65,7 +65,7 @@ Configure DMR:
 [plugins.config.server]
 enabled = true
 listen = ":8080"
-ui_path = "~/.dmr/web/dist"
+ui_path = "~/.dmr/var/lib/webserver/dist"
 ```
 
 #### Option 2: Independent Deployment
@@ -83,11 +83,11 @@ cors_origins = ["https://dmr-ui.example.com"]
 ## Makefile Commands
 
 ```bash
-make install    # Build and install to ~/.dmr/web/dist
+make install    # Build and install to ~/.dmr/var/lib/webserver/dist
 make build      # Build the UI (output to dist/)
 make dev        # Start development server (hot reload)
 make clean      # Remove build artifacts
-make uninstall  # Remove installed UI from ~/.dmr/web/
+make uninstall  # Remove installed UI from ~/.dmr/var/lib/webserver/
 make help       # Show help message
 ```
 
@@ -146,7 +146,7 @@ enabled = true
 [plugins.config.server]
 enabled = true
 listen = ":8080"
-ui_path = "~/.dmr/web/dist"  # Local UI path
+ui_path = "~/.dmr/var/lib/webserver/dist"  # Local UI path
 # or
 ui_url = "http://localhost:5173"  # Dev mode
 
@@ -200,8 +200,8 @@ make install
 
 # Or manually
 pnpm build
-rm -rf ~/.dmr/web/dist
-cp -r dist ~/.dmr/web/
+rm -rf ~/.dmr/var/lib/webserver/dist
+cp -r dist ~/.dmr/var/lib/webserver/
 ```
 
 ## Tech Stack
