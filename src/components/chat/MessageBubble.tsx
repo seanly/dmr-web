@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bot, Shield, ShieldAlert, Clock } from "lucide-react";
+import { Bot, Shield, ShieldAlert, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { Markdown } from "../Markdown";
 import type { Message, ApprovalInfo, ApprovalEventItem } from "../../types/chat";
 import { ToolCallCard } from "./ToolCallCard";
@@ -99,6 +99,7 @@ function SingleApprovalContent({ approval }: { approval: ApprovalInfo }) {
         )}
       </ul>
       {cmdText && <CmdBlock text={cmdText} />}
+      <ApprovalArgsDetails args={approval.args} />
     </>
   );
 }
@@ -141,9 +142,33 @@ function BatchApprovalContent({ requests }: { requests: ApprovalEventItem[] }) {
               {req.decision.risk === "high" && <span className="ml-1.5 text-xs text-destructive font-medium shrink-0">HIGH</span>}
             </div>
             {cmdText && <CmdBlock text={cmdText} />}
+            <ApprovalArgsDetails args={req.args} />
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function ApprovalArgsDetails({ args }: { args?: Record<string, unknown> }) {
+  if (!args) return null;
+  const { cmd, ...rest } = args;
+  if (Object.keys(rest).length === 0) return null;
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="mt-1">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+      >
+        {expanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+        <span>{expanded ? "Hide details" : "Show details"}</span>
+      </button>
+      {expanded && (
+        <pre className="mt-1 bg-muted/60 p-2 rounded text-xs font-mono overflow-auto max-h-[200px]">
+          {JSON.stringify(rest, null, 2)}
+        </pre>
+      )}
     </div>
   );
 }
